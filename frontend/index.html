@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>دكّان — متجرك الإلكتروني</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">دكّان<span>كل شي بتحتاجه، بمكان وحد</span></div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <nav><a href="admin.html">لوحة التحكم</a></nav>
+      <div class="cart-badge">🛒 السلة (<span id="cartCount">0</span>)</div>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>تسوق بثقة، توصيل بسرعة</h1>
+    <p>مجموعة مختارة من المنتجات بأسعار منافسة</p>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="filters" id="filters">
+    <button class="active" data-cat="">الكل</button>
+  </div>
+  <div class="grid" id="productGrid">
+    <p class="empty-note">جاري تحميل المنتجات...</p>
+  </div>
+</div>
+
+<footer>دكّان — نموذج تجريبي لعرض المهارات التقنية (Full-Stack)</footer>
+
+<script src="js/api.js"></script>
+<script>
+(function () {
+  let allProducts = [];
+  let cart = [];
+
+  const grid = document.getElementById('productGrid');
+  const filtersEl = document.getElementById('filters');
+  const cartCountEl = document.getElementById('cartCount');
+
+  function renderProducts(list) {
+    if (!list.length) {
+      grid.innerHTML = '<p class="empty-note">لا يوجد منتجات حالياً. أضف منتجات من لوحة التحكم.</p>';
+      return;
+    }
+    grid.innerHTML = list.map(p => `
+      <div class="card">
+        <img src="${p.imageUrl || 'https://placehold.co/400x300/1B2430/F7F5F1?text=' + encodeURIComponent(p.name)}" alt="${p.name}">
+        <div class="card-body">
+          <span class="cat">${p.category}</span>
+          <h3>${p.name}</h3>
+          <p>${p.description}</p>
+          <div class="card-footer">
+            <span class="price">${p.price} ₪</span>
+            <button class="btn amber" data-id="${p._id}">أضف للسلة</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        cart.push(btn.dataset.id);
+        cartCountEl.textContent = cart.length;
+      });
+    });
+  }
+
+  function renderFilters(list) {
+    const categories = [...new Set(list.map(p => p.category))];
+    filtersEl.innerHTML = '<button class="active" data-cat="">الكل</button>' +
+      categories.map(c => `<button data-cat="${c}">${c}</button>`).join('');
+
+    filtersEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filtersEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const cat = btn.dataset.cat;
+        renderProducts(cat ? allProducts.filter(p => p.category === cat) : allProducts);
+      });
+    });
+  }
+
+  async function loadProducts() {
+    try {
+      allProducts = await apiGet('/products');
+      renderFilters(allProducts);
+      renderProducts(allProducts);
+    } catch (err) {
+      grid.innerHTML = `<p class="empty-note">تعذر الاتصال بالسيرفر. تأكد إن الـ backend شغال على الرابط المحدد بملف api.js.<br><small>${err.message}</small></p>`;
+    }
+  }
+
+  loadProducts();
+})();
+</script>
+
+</body>
+</html>

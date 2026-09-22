@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>دكّان — لوحة التحكم</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">دكّان<span>لوحة تحكم المنتجات</span></div>
+    <nav><a href="index.html">عرض المتجر ↗</a></nav>
+  </div>
+</header>
+
+<div class="wrap admin-wrap">
+  <div class="admin-head">
+    <h2 style="margin:0;">إدارة المنتجات</h2>
+    <button class="btn amber" id="addBtn">+ إضافة منتج جديد</button>
+  </div>
+  <div class="status-msg" id="statusMsg"></div>
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>صورة</th>
+        <th>الاسم</th>
+        <th>الفئة</th>
+        <th>السعر</th>
+        <th>المخزون</th>
+        <th>إجراءات</th>
+      </tr>
+    </thead>
+    <tbody id="productsBody">
+      <tr><td colspan="6">جاري التحميل...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">إضافة منتج جديد</h3>
+    <form id="productForm">
+      <input type="hidden" id="productId">
+      <label for="name">اسم المنتج</label>
+      <input type="text" id="name" required>
+
+      <label for="description">الوصف</label>
+      <textarea id="description" rows="3" required></textarea>
+
+      <label for="price">السعر (₪)</label>
+      <input type="number" id="price" min="0" step="0.01" required>
+
+      <label for="category">الفئة</label>
+      <input type="text" id="category" required>
+
+      <label for="stock">الكمية بالمخزون</label>
+      <input type="number" id="stock" min="0" required>
+
+      <label for="imageUrl">رابط صورة المنتج (اختياري)</label>
+      <input type="url" id="imageUrl" placeholder="https://...">
+
+      <div class="status-msg" id="formMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn amber">حفظ</button>
+        <button type="button" class="btn" id="cancelBtn" style="background:#555;">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+(function () {
+  const productsBody = document.getElementById('productsBody');
+  const statusMsg = document.getElementById('statusMsg');
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const productForm = document.getElementById('productForm');
+  const formMsg = document.getElementById('formMsg');
+
+  let products = [];
+
+  async function loadProducts() {
+    try {
+      products = await apiGet('/products');
+      renderTable();
+    } catch (err) {
+      statusMsg.textContent = 'تعذر الاتصال بالسيرفر: ' + err.message;
+      statusMsg.className = 'status-msg error';
+      productsBody.innerHTML = '<tr><td colspan="6">لا يوجد اتصال بالـ backend</td></tr>';
+    }
+  }
+
+  function renderTable() {
+    if (!products.length) {
+      productsBody.innerHTML = '<tr><td colspan="6">لا يوجد منتجات. أضف أول منتج.</td></tr>';
+      return;
+    }
+    productsBody.innerHTML = products.map(p => `
+      <tr>
+        <td><img src="${p.imageUrl || 'https://placehold.co/60x60/1B2430/F7F5F1?text=+'}" alt=""></td>
+        <td>${p.name}</td>
+        <td>${p.category}</td>
+        <td>${p.price} ₪</td>
+        <td>${p.stock}</td>
+        <td class="actions">
+          <button class="btn" data-edit="${p._id}">تعديل</button>
+          <button class="btn danger" data-delete="${p._id}">حذف</button>
+        </td>
+      </tr>
+    `).join('');
+
+    productsBody.querySelectorAll('button[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => openModal(btn.dataset.edit));
+    });
+    productsBody.querySelectorAll('button[data-delete]').forEach(btn => {
+      btn.addEventListener('click', () => deleteProduct(btn.dataset.delete));
+    });
+  }
+
+  function openModal(id) {
+    formMsg.textContent = '';
+    if (id) {
+      const p = products.find(x => x._id === id);
+      modalTitle.textContent = 'تعديل المنتج';
+      document.getElementById('productId').value = p._id;
+      document.getElementById('name').value = p.name;
+      document.getElementById('description').value = p.description;
+      document.getElementById('price').value = p.price;
+      document.getElementById('category').value = p.category;
+      document.getElementById('stock').value = p.stock;
+      document.getElementById('imageUrl').value = p.imageUrl || '';
+    } else {
+      modalTitle.textContent = 'إضافة منتج جديد';
+      productForm.reset();
+      document.getElementById('productId').value = '';
+    }
+    modalOverlay.classList.add('show');
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('show');
+  }
+
+  document.getElementById('addBtn').addEventListener('click', () => openModal(null));
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
+  productForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('productId').value;
+    const data = {
+      name: document.getElementById('name').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      price: parseFloat(document.getElementById('price').value),
+      category: document.getElementById('category').value.trim(),
+      stock: parseInt(document.getElementById('stock').value, 10),
+      imageUrl: document.getElementById('imageUrl').value.trim(),
+    };
+    try {
+      if (id) {
+        await apiPut(`/products/${id}`, data);
+      } else {
+        await apiPost('/products', data);
+      }
+      closeModal();
+      statusMsg.textContent = 'تم الحفظ بنجاح ✓';
+      statusMsg.className = 'status-msg success';
+      loadProducts();
+    } catch (err) {
+      formMsg.textContent = err.message;
+      formMsg.className = 'status-msg error';
+    }
+  });
+
+  async function deleteProduct(id) {
+    if (!confirm('متأكد إنك بدك تحذف هذا المنتج؟')) return;
+    try {
+      await apiDelete(`/products/${id}`);
+      statusMsg.textContent = 'تم الحذف ✓';
+      statusMsg.className = 'status-msg success';
+      loadProducts();
+    } catch (err) {
+      statusMsg.textContent = 'فشل الحذف: ' + err.message;
+      statusMsg.className = 'status-msg error';
+    }
+  }
+
+  loadProducts();
+})();
+</script>
+
+</body>
+</html>
